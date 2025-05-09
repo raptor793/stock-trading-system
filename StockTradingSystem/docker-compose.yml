@@ -1,0 +1,123 @@
+version: '3.9'
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"       # RabbitMQ messaging port
+      - "15672:15672"     # RabbitMQ management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - trading-net
+      - internal 
+
+  order-db:
+    image: postgres:latest
+    container_name: order-database
+    restart: always
+    environment:
+      POSTGRES_DB: OrderDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_order_data:/var/lib/postgresql/data
+    networks:
+      - trading-net
+      - internal  
+
+  portfolio-db:
+    image: postgres:latest
+    container_name: portfolio-database
+    restart: always
+    environment:
+      POSTGRES_DB: PortfolioDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_portfolio_data:/var/lib/postgresql/data
+    networks:
+      - trading-net
+      - internal 
+
+  gateway:
+    image: ${DOCKER_REGISTRY-}gateway
+    build:
+      context: .
+      dockerfile: Gateway/Dockerfile
+    container_name: gateway
+    depends_on:
+      - orderservice
+      - portfolioservice
+      - priceservice
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5000:5000"
+    networks:
+      - trading-net
+      - internal 
+
+  orderservice:
+    image: ${DOCKER_REGISTRY-}orderservice
+    build:
+      context: .
+      dockerfile: OrderService/Dockerfile
+    container_name: orderservice
+    depends_on:
+      - rabbitmq
+      - order-db
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Postgres=Host=order-db;Port=5432;Database=OrderDb;Username=postgres;Password=postgres;Include Error Detail=true;
+    ports:
+      - "5001:5001"
+    networks:
+      - internal
+
+  portfolioservice:
+    image: ${DOCKER_REGISTRY-}portfolioservice
+    build:
+      context: .
+      dockerfile: PortfolioService/Dockerfile
+    container_name: portfolioservice
+    depends_on:
+      - rabbitmq
+      - portfolio-db
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Postgres=Host=portfolio-db;Port=5432;Database=PortfolioDb;Username=postgres;Password=postgres;Include Error Detail=true;
+    ports:
+      - "5002:5002"
+    networks:
+      - internal
+
+  priceservice:
+    image: ${DOCKER_REGISTRY-}priceservice
+    build:
+      context: .
+      dockerfile: PriceService/Dockerfile
+    container_name: priceservice
+    depends_on:
+      - rabbitmq
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - internal
+
+networks:
+  trading-net:
+   driver: bridge
+  internal:
+    internal: true
+
+volumes:
+  pg_order_data:
+  pg_portfolio_data:
