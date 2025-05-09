@@ -4,6 +4,7 @@
 2. Run docker-compose up --build from the directory of the project, where there is a docker-compose file
 
 3. After a successful build se these links to access the gateway:
+
 Order Service - http://localhost:5000/orderservice/swagger/index.html
 Portfolio Service - http://localhost:5000/portfolioservice/swagger/index.html
 
